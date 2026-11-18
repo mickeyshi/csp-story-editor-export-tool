@@ -5,6 +5,7 @@ Run with:  python -m csp_story gui    (or: pythonw -m csp_story gui  for no cons
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import shlex
 import subprocess
@@ -15,6 +16,26 @@ from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
 
 DEFAULT_SCRIPT = "script.txt"
+
+
+def comic_for_script(script: str) -> str | None:
+    """The comic a script was exported from: its .cmc if there is exactly one next
+    to the pages, otherwise the first page .clip. None if it can't be determined."""
+    try:
+        with open(script + ".snapshot.json", encoding="utf-8") as f:
+            clips = [o["clip"] for o in json.load(f)]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if not clips:
+        return None
+    folder = os.path.dirname(os.path.abspath(clips[0]))
+    try:
+        cmcs = [n for n in os.listdir(folder) if n.lower().endswith(".cmc")]
+    except OSError:
+        return None
+    if len(cmcs) == 1:
+        return os.path.join(folder, cmcs[0])
+    return os.path.abspath(clips[0]) if os.path.exists(clips[0]) else None
 
 
 class _LogWriter:
@@ -124,7 +145,13 @@ class App(ttk.Frame):
                 "Import", "Write the edited text into the comic's .clip files?\n\n"
                           "Make sure the comic is closed in Clip Studio."):
             return
-        self.run(args)
+        if self.run(args) != 0:
+            return
+        if not self.dry_run.get():
+            target = comic_for_script(script)
+            if target:
+                self.log_link(f"Open {os.path.basename(target)} in Clip Studio", target)
+        self.log("")
 
     def run(self, argv: list[str]) -> int:
         from .__main__ import main  # same code path as the command line

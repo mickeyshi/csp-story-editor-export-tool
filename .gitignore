@@ -1,0 +1,6 @@
+__pycache__/
+scratch/
+*.clip.bak*
+*.snapshot.json
+story.txt
+script.txt
